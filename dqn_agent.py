@@ -20,7 +20,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class Agent():
     """Interacts with and learns from the environment."""
 
-    def __init__(self, state_size, action_size, seed):
+    def __init__(self, state_size, action_size, seed, use_ddqn=True):
         """Initialize an Agent object.
         
         Params
@@ -32,6 +32,7 @@ class Agent():
         self.state_size = state_size
         self.action_size = action_size
         self.seed = random.seed(seed)
+        self.use_ddqn = use_ddqn
 
         # Q-Network
         self.qnetwork_local = QNetwork(state_size, action_size, seed).to(device)
@@ -53,7 +54,10 @@ class Agent():
             # If enough samples are available in memory, get random subset and learn
             if len(self.memory) > BATCH_SIZE:
                 experiences = self.memory.sample()
-                self.learn(experiences, GAMMA)
+                if self.use_ddqn:  # Use double dqn for training if selected
+                    self.learn_ddqn(experiences, GAMMA)
+                else:
+                    self.learn(experiences, GAMMA)
 
     def act(self, state, eps=0.):
         """Returns actions for given state as per current policy.
@@ -85,14 +89,8 @@ class Agent():
         """
         states, actions, rewards, next_states, dones = experiences
 
-        # Get best actions from local model to use in the double DQN 
-        best_actions_local = self.qnetwork_local(next_states).detach().argmax(dim=1).unsqueeze(1)
-
-        # Get predicted Q values (for next states) from target model using actions selected from double DQN using local model
-        qvalue_target = self.qnetwork_target(next_states).detach().gather(1, best_actions_local)
-        
         # compute and minimize the loss
-        #qvalue_target = self.qnetwork_target.forward(next_states).detach().max(1)[0].unsqueeze(1)
+        qvalue_target = self.qnetwork_target.forward(next_states).detach().max(1)[0].unsqueeze(1)
         y = rewards + gamma*qvalue_target*(1-dones)
         
         qvalue = self.qnetwork_local.forward(states).gather(1,actions)
@@ -108,7 +106,41 @@ class Agent():
         self.optimizer.step()
 
         # ------------------- update target network ------------------- #
-        self.soft_update(self.qnetwork_local, self.qnetwork_target, TAU)                     
+        self.soft_update(self.qnetwork_local, self.qnetwork_target, TAU)   
+
+    def learn_ddqn(self, experiences, gamma):
+        """Update value parameters using given batch of experience tuples uaing double dqn method.
+
+        Params
+        ======
+            experiences (Tuple[torch.Variable]): tuple of (s, a, r, s', done) tuples 
+            gamma (float): discount factor
+        """
+        states, actions, rewards, next_states, dones = experiences
+
+        # Get best actions from local model to use in the double DQN 
+        best_actions_local = self.qnetwork_local(next_states).detach().argmax(dim=1).unsqueeze(1)
+
+        # Get predicted Q values (for next states) from target model using actions selected from double DQN using local model
+        qvalue_target = self.qnetwork_target(next_states).detach().gather(1, best_actions_local)
+        
+        # compute and minimize the loss
+        y = rewards + gamma*qvalue_target*(1-dones)
+        
+        qvalue = self.qnetwork_local.forward(states).gather(1,actions)
+        #print("Best actions:")
+        #print(qvalue)
+        loss = F.mse_loss(y, qvalue)
+        
+        # Optimize the model
+        self.optimizer.zero_grad()
+        loss.backward()
+        #for param in self.qnetwork_local.parameters():
+        #    param.grad.data.clamp_(-1, 1)
+        self.optimizer.step()
+
+        # ------------------- update target network ------------------- #
+        self.soft_update(self.qnetwork_local, self.qnetwork_target, TAU)                    
 
     def soft_update(self, local_model, target_model, tau):
         """Soft update model parameters.
