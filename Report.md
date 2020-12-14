@@ -21,9 +21,9 @@ https://github.com/SorenRusbjerg/RL_Navigation/blob/master/Navigation_local_ddqn
 
 # Future work
 The DQN algorithm could be extended with a prioritized replay buffer to give higher probability to more important SARSA samples compared to less important samples. 
-Also extending with a Dueling DQN, could result in faster training, as it will seperate the stae value function and advantage function, giving the action values gain to the state value function. This provides better policies for environments with similar valued action-value functions. However as we only have 4 actions in this game, it might not give much extra improvement.
+Also extending with a Dueling DQN, could result in faster training, as it will seperate the state value function and advantage function, giving the action values gain to the state value function. This provides better policies for environments with many similar valued action-value functions. However as we only have 4 actions in this game, it might not give much extra improvement.
 
-More experimentation with hyper paramers such as the NN layers composition and the discount factor GAMMA could also prove to be usefull.
+More experimentation with hyper paramers such as the NN layer composition and the discount factor GAMMA could also prove to be usefull.
 
 
 
